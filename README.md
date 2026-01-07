@@ -1,20 +1,39 @@
 # myPanel
 
-Version: 1.6
+Version: 1.7
 
 ## Overview
 
-myPanel is a lightweight Electron-based application designed to manage and access frequently used files through a simple panel interface. With an intuitive UI built using Vue.js, users can quickly select and open their last accessed files.
+myPanel is a lightweight macOS application built with SwiftUI designed to manage and access frequently used files and applications through a simple panel interface. Users can quickly select and open their frequently used files with a clean and intuitive UI.
 
 ## Features
 
-- Quick file access panel
+- Quick file and application access panel (9 slots)
 - Persistent storage of last opened files
 - Customizable preferences (theme and language)
-- Window state preservation
-- Simple and clean user interface
+- Support for both regular files and .app applications
+- File/application icon display for each item
+- Individual item clear/reset functionality
+- Global reset functionality to clear all configuration
+- Clean and intuitive user interface with consistent layout
+- Version information display
 
 ## Changelog
+
+### Version 1.7
+
+#### New Features
+- Added individual clear button for each file item (X icon in red)
+- Added file/application icon display between button and file name
+- Updated application icon with new design
+
+#### Improvements
+- Optimized button size for better layout balance
+- Unified element heights (32px) for consistent visual alignment
+- Updated project documentation to reflect SwiftUI technology stack
+- Unified version numbering across all files to 1.7
+- Fixed inconsistency in element count (6 vs 9) in reset and load functions
+- Updated creation date to 2026-01-07
 
 ### Version 1.6
 
@@ -60,12 +79,18 @@ myPanel is a lightweight Electron-based application designed to manage and acces
 ## Installation
 
 1. Clone the repository
-2. Install dependencies with `npm install`
-3. Start the application with `npm start`
+2. Open `myPanel.xcodeproj` in Xcode
+3. Build and run the application (⌘R)
 
 ## Usage
 
-Launch the application and use the panel buttons to select and open your frequently used files. The application remembers your last opened files and preferences.
+Launch the application and use the panel buttons to select and open your frequently used files. Each item displays:
+- A button to select or open the file/application
+- The file/application icon
+- The file name
+- A clear button (X icon) to remove the item
+
+The application remembers your last opened files and preferences automatically. Use the reset button in the top-right corner to clear all configuration.
 
 ## Configuration
 

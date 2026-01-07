@@ -56,10 +56,10 @@ struct ContentView: View {
                         Text("Shylock Wolf")
                             .font(.caption)
                             .foregroundColor(.gray)
-                        Text("v 1.6")
+                        Text("v 1.7")
                             .font(.caption)
                             .foregroundColor(.gray)
-                        Text("2025-11-16")
+                        Text("2026-01-07")
                             .font(.caption)
                             .foregroundColor(.gray)
                     }
@@ -68,30 +68,51 @@ struct ContentView: View {
                 .padding(.horizontal, 20)
                 
                 ForEach(0..<9, id: \.self) { index in
-                    HStack(spacing: 15) {
+                    HStack(spacing: 10) {
                         Button(action: {
                             handleButtonClick(index: index)
                         }) {
                             Text(buttonLabels[index])
-                                .font(.system(size: 14, weight: .medium))
+                                .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.white)
-                                .frame(width: 80, height: 40)
+                                .frame(width: 65, height: 32)
                                 .background(Color.blue)
-                                .cornerRadius(8)
+                                .cornerRadius(6)
                         }
                         .buttonStyle(PlainButtonStyle())
+                        
+                        if let icon = getFileIcon(for: index) {
+                            Image(nsImage: icon)
+                                .resizable()
+                                .frame(width: 32, height: 32)
+                        } else {
+                            Image(systemName: "questionmark.app.fill")
+                                .font(.system(size: 24))
+                                .foregroundColor(.gray)
+                                .frame(width: 32, height: 32)
+                        }
                         
                         Text(getFileName(for: index))
                             .font(.system(size: 12))
                             .foregroundColor(.primary)
-                            .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+                            .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
                             .padding(.horizontal, 10)
                             .background(Color.gray.opacity(0.1))
-                            .cornerRadius(8)
+                            .cornerRadius(6)
                             .overlay(
-                                RoundedRectangle(cornerRadius: 8)
+                                RoundedRectangle(cornerRadius: 6)
                                     .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                             )
+                        
+                        Button(action: {
+                            clearItem(index: index)
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.red)
+                                .font(.system(size: 16))
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .help("清除此项目")
                     }
                     .padding(.horizontal, 20)
                 }
@@ -114,6 +135,12 @@ struct ContentView: View {
         } else {
             openFile(index: index)
         }
+    }
+    
+    private func clearItem(index: Int) {
+        selectedFiles[index] = ""
+        buttonLabels[index] = "选择文件"
+        saveConfig()
     }
     
     private func selectFile(index: Int) {
@@ -189,6 +216,14 @@ struct ContentView: View {
         } else {
             return URL(fileURLWithPath: filePath).lastPathComponent
         }
+    }
+    
+    private func getFileIcon(for index: Int) -> NSImage? {
+        let filePath = selectedFiles[index]
+        guard !filePath.isEmpty else {
+            return nil
+        }
+        return NSWorkspace.shared.icon(forFile: filePath)
     }
     
     private func saveConfig() {
@@ -272,12 +307,12 @@ struct ContentView: View {
     
     private func loadFiles(_ files: [String]) {
         var loadedFiles = files
-        // 确保有6个元素
-        if loadedFiles.count < 6 {
-            loadedFiles.append(contentsOf: Array(repeating: "", count: 6 - loadedFiles.count))
+        // 确保有9个元素
+        if loadedFiles.count < 9 {
+            loadedFiles.append(contentsOf: Array(repeating: "", count: 9 - loadedFiles.count))
         }
         
-        for i in 0..<min(6, loadedFiles.count) {
+        for i in 0..<min(9, loadedFiles.count) {
             if !loadedFiles[i].isEmpty {
                 let isFile = FileManager.default.fileExists(atPath: loadedFiles[i])
                 let isAppBundle = URL(fileURLWithPath: loadedFiles[i]).pathExtension == "app" && FileManager.default.fileExists(atPath: loadedFiles[i])
@@ -322,8 +357,8 @@ struct ContentView: View {
             }
             
             // 重置应用状态
-            selectedFiles = Array(repeating: "", count: 6)
-            buttonLabels = Array(repeating: "选择文件", count: 6)
+            selectedFiles = Array(repeating: "", count: 9)
+            buttonLabels = Array(repeating: "选择文件", count: 9)
             
             showAlert(title: "重置成功", message: "应用已重置为初始状态")
         } catch {
