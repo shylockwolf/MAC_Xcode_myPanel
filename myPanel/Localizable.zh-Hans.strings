@@ -1,0 +1,19 @@
+/* Localizable zh-Hans placeholders handled via Localizable.strings in zh-Hans.lproj folder */
+"app_title" = "myPanel";
+"author" = "Shylock Wolf";
+"version" = "v 1.7";
+"date" = "2026-01-07";
+"reset_app" = "重置应用";
+"reset_confirm" = "这将清空所有配置并重置应用为初始状态。您确定要继续吗？";
+"reset_success" = "重置成功";
+"select_file" = "选择文件";
+"open_file" = "打开";
+"not_selected_file" = "未选择文件";
+"ok" = "确定";
+"cancel" = "取消";
+"warning" = "警告";
+"open_failed" = "打开失败";
+"clear_item" = "清除此项";
+"reset_again" = "再次重置";
+"app_action_open" = "打开应用";
+"app_action_select" = "选择文件";
