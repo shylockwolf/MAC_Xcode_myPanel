@@ -63,10 +63,10 @@ struct ContentView: View {
                         Text("Shylock Wolf")
                             .font(.caption)
                             .foregroundColor(.gray)
-                        Text("ver 2.0.0")
+                        Text("ver 2.0.1")
                             .font(.caption)
                             .foregroundColor(.gray)
-                        Text("2026-01-13")
+                        Text("2026-01-15")
                             .font(.caption)
                             .foregroundColor(.gray)
                     }
@@ -79,13 +79,11 @@ struct ContentView: View {
                         Button(action: {
                             handleButtonClick(index: idx)
                         }) {
-                            Image(systemName: "doc.circle.fill")
-                                .foregroundColor(disabledButtons[idx] ? .gray : .blue)
+                            Image(systemName: selectedFiles[idx].isEmpty ? "paperclip.circle" : "play.circle")
+                                .foregroundColor(.blue)
                                 .font(.system(size: 32))
                         }
                         .buttonStyle(PlainButtonStyle())
-                        .disabled(disabledButtons[idx])
-                        .disabled(disabledButtons[idx])
 
                         if let icon = getFileIcon(for: idx) {
                             Image(nsImage: icon)
@@ -133,12 +131,8 @@ struct ContentView: View {
     }
 
     private func handleButtonClick(index: Int) {
-        if buttonLabels[index] == "select" {
-            if selectedFiles[index].isEmpty {
-                selectFile(index: index)
-            } else {
-                openFile(index: index)
-            }
+        if selectedFiles[index].isEmpty {
+            selectFile(index: index)
         } else {
             openFile(index: index)
         }
@@ -147,7 +141,6 @@ struct ContentView: View {
     private func clearItem(index: Int) {
         selectedFiles[index] = ""
         buttonLabels[index] = "select"
-        disabledButtons[index] = false
         saveConfig()
     }
 
@@ -166,8 +159,6 @@ struct ContentView: View {
                 logDebug("文件存在: \(isFile), 是应用包: \(isAppBundle)")
                 if isFile || isAppBundle {
                     selectedFiles[index] = url.path
-                    // keep label as "select" and disable
-                    disabledButtons[index] = true
                     saveConfig()
                     logInfo("成功选择文件 \(index + 1): \(url.path)")
                 } else {
@@ -300,6 +291,6 @@ struct ContentView: View {
     }
 }
 
-#Preview {
-    ContentView()
-}
+// #Preview {
+//     ContentView()
+// }

@@ -1,6 +1,6 @@
 # myPanel
 
-Version: 1.7
+Version: 2.0.1
 
 ## Overview
 
@@ -19,6 +19,19 @@ myPanel is a lightweight macOS application built with SwiftUI designed to manage
 - Version information display
 
 ## Changelog
+
+### Version 2.0.1
+
+#### New Features
+- Updated version number to 2.0.1
+- Updated creation date to 2026-01-15
+
+### Version 2.0.0
+
+#### New Features
+- Changed button icon from "doc.circle.fill" to "play.circle" with blue color
+- Simplified button click handling to directly open files
+- Optimized button disabled logic using selectedFiles array
 
 ### Version 1.7
 
