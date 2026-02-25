@@ -47,7 +47,6 @@ private var configURL: URL {
             }
             if let old = try? decoder.decode([String].self, from: data) {
                 logInfo("Loaded old format config from \(url.path); migrating to new format")
-                // migrate to new format
                 let times = old.map { path -> TimeInterval in
                     if path.isEmpty { return 0 }
                     if FileManager.default.fileExists(atPath: path) {
@@ -57,7 +56,7 @@ private var configURL: URL {
                     }
                     return 0
                 }
-                let migrated = AppConfig(lastOpenedFiles: old, preferences: Preferences(theme: "default", language: "en"), lastModifiedTimes: times)
+                let migrated = AppConfig(lastOpenedFiles: old, preferences: Preferences(theme: "default", language: "en"), lastModifiedTimes: times, itemCount: old.count)
                 saveConfig(migrated)
                 return migrated
             }

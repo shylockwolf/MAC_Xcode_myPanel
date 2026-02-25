@@ -25,6 +25,7 @@ struct ContentView: View {
     @State private var buttonLabels: [String] = Array(repeating: "select", count: 9)
     @State private var prefs = Preferences(theme: "default", language: "en")
     @State private var disabledButtons: [Bool] = Array(repeating: false, count: 9)
+    @State private var itemCount: Int = 9
 
     private let configFileURL: URL = {
         #if DEBUG
@@ -49,7 +50,7 @@ struct ContentView: View {
                             .cornerRadius(8)
                     }
                     .buttonStyle(PlainButtonStyle())
-                    .help("Reset App")
+                    .help("设置项目数量")
 
                     Spacer()
 
@@ -63,10 +64,10 @@ struct ContentView: View {
                         Text("Shylock Wolf")
                             .font(.caption)
                             .foregroundColor(.gray)
-                        Text("ver 2.0.1")
+                        Text("ver 2.1.0")
                             .font(.caption)
                             .foregroundColor(.gray)
-                        Text("2026-01-15")
+                        Text("2026-02-25")
                             .font(.caption)
                             .foregroundColor(.gray)
                     }
@@ -74,7 +75,7 @@ struct ContentView: View {
                 .padding(.top, 20)
                 .padding(.horizontal, 20)
 
-                ForEach(0..<9) { idx in
+                ForEach(0..<itemCount, id: \.self) { idx in
                     HStack(spacing: 10) {
                         Button(action: {
                             handleButtonClick(index: idx)
@@ -233,23 +234,54 @@ struct ContentView: View {
                 lastModifiedTimes.append(0)
             }
         }
-        let cfg = AppConfig(lastOpenedFiles: selectedFiles, preferences: prefs, lastModifiedTimes: lastModifiedTimes)
+        let cfg = AppConfig(lastOpenedFiles: selectedFiles, preferences: prefs, lastModifiedTimes: lastModifiedTimes, itemCount: itemCount)
         ConfigManager.shared.saveConfig(cfg)
     }
 
     private func loadConfig() {
+        print("DEBUG: 开始加载配置")
         if let cfg = ConfigManager.shared.loadConfig() {
+            print("DEBUG: 配置加载成功, itemCount=\(cfg.itemCount), lastOpenedFiles.count=\(cfg.lastOpenedFiles.count)")
             selectedFiles = cfg.lastOpenedFiles
             prefs = cfg.preferences
-            for i in 0..<min(9, cfg.lastOpenedFiles.count) {
+            itemCount = cfg.itemCount
+            
+            let currentCount = selectedFiles.count
+            if currentCount < itemCount {
+                let additionalCount = itemCount - currentCount
+                selectedFiles.append(contentsOf: Array(repeating: "", count: additionalCount))
+                buttonLabels.append(contentsOf: Array(repeating: "select", count: additionalCount))
+                disabledButtons.append(contentsOf: Array(repeating: false, count: additionalCount))
+            } else if currentCount > itemCount {
+                selectedFiles = Array(selectedFiles.prefix(itemCount))
+            }
+            
+            if buttonLabels.count < itemCount {
+                buttonLabels = Array(repeating: "select", count: itemCount)
+            } else {
+                buttonLabels = Array(buttonLabels.prefix(itemCount))
+            }
+            
+            if disabledButtons.count < itemCount {
+                disabledButtons = Array(repeating: false, count: itemCount)
+            } else {
+                disabledButtons = Array(disabledButtons.prefix(itemCount))
+            }
+            
+            for i in 0..<min(itemCount, cfg.lastOpenedFiles.count) {
                 if !cfg.lastOpenedFiles[i].isEmpty {
                     buttonLabels[i] = "open"
                     disabledButtons[i] = true
                 }
             }
+            print("DEBUG: 配置应用完成, itemCount=\(itemCount), selectedFiles.count=\(selectedFiles.count)")
             logInfo("Config loaded via ConfigManager, applying to UI")
         } else {
+            print("DEBUG: 没有找到配置文件，使用默认值")
             logDebug("No config found; using defaults")
+            selectedFiles = Array(repeating: "", count: itemCount)
+            buttonLabels = Array(repeating: "select", count: itemCount)
+            disabledButtons = Array(repeating: false, count: itemCount)
         }
     }
 
@@ -264,14 +296,44 @@ struct ContentView: View {
 
     private func showResetConfirmation() {
         let alert = NSAlert()
-        alert.messageText = L("reset_app")
-        alert.informativeText = L("reset_confirm")
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: L("reset_app"))
-        alert.addButton(withTitle: L("cancel"))
-        if alert.runModal() == .alertFirstButtonReturn {
-            resetApp()
+        alert.messageText = "设置项目数量"
+        alert.informativeText = "请输入您想要的项目数量 (1-50):"
+        alert.alertStyle = .informational
+        
+        let textField = NSTextField(frame: NSRect(x: 0, y: 0, width: 200, height: 24))
+        textField.stringValue = "\(itemCount)"
+        alert.accessoryView = textField
+        alert.addButton(withTitle: "确定")
+        alert.addButton(withTitle: "取消")
+        
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            if let newValue = Int(textField.stringValue), newValue >= 1 && newValue <= 50 {
+                updateItemCount(newValue)
+            } else {
+                showAlert(title: "错误", message: "请输入 1 到 50 之间的数字")
+            }
         }
+    }
+
+    private func updateItemCount(_ newCount: Int) {
+        let oldCount = itemCount
+        itemCount = newCount
+        
+        if newCount > oldCount {
+            let additionalCount = newCount - oldCount
+            selectedFiles.append(contentsOf: Array(repeating: "", count: additionalCount))
+            buttonLabels.append(contentsOf: Array(repeating: "select", count: additionalCount))
+            disabledButtons.append(contentsOf: Array(repeating: false, count: additionalCount))
+        } else if newCount < oldCount {
+            selectedFiles = Array(selectedFiles.prefix(newCount))
+            buttonLabels = Array(buttonLabels.prefix(newCount))
+            disabledButtons = Array(disabledButtons.prefix(newCount))
+        }
+        
+        saveConfig()
+        logInfo("项目数量已从 \(oldCount) 更新为 \(newCount)")
+        print("DEBUG: itemCount=\(itemCount), selectedFiles.count=\(selectedFiles.count)")
     }
 
     private func resetApp() {
@@ -280,9 +342,9 @@ struct ContentView: View {
                 try FileManager.default.removeItem(at: configFileURL)
                 logInfo("已删除配置文件: \(configFileURL.path)")
             }
-            selectedFiles = Array(repeating: "", count: 9)
-            buttonLabels = Array(repeating: "select", count: 9)
-            disabledButtons = Array(repeating: false, count: 9)
+            selectedFiles = Array(repeating: "", count: itemCount)
+            buttonLabels = Array(repeating: "select", count: itemCount)
+            disabledButtons = Array(repeating: false, count: itemCount)
             showAlert(title: L("reset_app"), message: L("reset_success"))
         } catch {
             logError("重置应用失败: \(error.localizedDescription)")
