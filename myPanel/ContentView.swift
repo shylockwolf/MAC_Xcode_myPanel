@@ -40,17 +40,48 @@ struct ContentView: View {
         ScrollView {
             VStack(spacing: 15) {
                 HStack {
-                    Button(action: {
-                        showResetConfirmation()
-                    }) {
-                        Image(systemName: "arrow.counterclockwise")
+                    HStack(spacing: 5) {
+                        Text("数量")
+                            .font(.caption)
                             .foregroundColor(.gray)
-                            .padding(8)
-                            .background(Color.gray.opacity(0.1))
-                            .cornerRadius(8)
+                        Button(action: {
+                            print("DEBUG: 点击 - 按钮, 当前 itemCount=\(itemCount)")
+                            if itemCount > 1 {
+                                updateItemCount(itemCount - 1)
+                            } else {
+                                print("DEBUG: itemCount <= 1, 不能减少")
+                            }
+                        }) {
+                            Image(systemName: "minus")
+                                .font(.system(size: 12))
+                                .foregroundColor(.gray)
+                                .frame(width: 24, height: 24)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        Text("\(itemCount)")
+                            .font(.system(size: 14, weight: .medium))
+                            .frame(minWidth: 25)
+                        Button(action: {
+                            print("DEBUG: 点击 + 按钮, 当前 itemCount=\(itemCount)")
+                            if itemCount < 50 {
+                                updateItemCount(itemCount + 1)
+                            } else {
+                                print("DEBUG: itemCount >= 50, 不能增加")
+                            }
+                        }) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 12))
+                                .foregroundColor(.gray)
+                                .frame(width: 24, height: 24)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(PlainButtonStyle())
                     }
-                    .buttonStyle(PlainButtonStyle())
-                    .help("设置项目数量")
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(8)
 
                     Spacer()
 
@@ -64,10 +95,10 @@ struct ContentView: View {
                         Text("Shylock Wolf")
                             .font(.caption)
                             .foregroundColor(.gray)
-                        Text("ver 2.1.0")
+                        Text("ver 2.1.1")
                             .font(.caption)
                             .foregroundColor(.gray)
-                        Text("2026-02-25")
+                        Text("2026-03")
                             .font(.caption)
                             .foregroundColor(.gray)
                     }
@@ -125,10 +156,18 @@ struct ContentView: View {
             }
         }
         .frame(minWidth: 350, idealWidth: 350, maxWidth: .infinity,
-               minHeight: 450, idealHeight: 450, maxHeight: .infinity)
+               minHeight: 450, idealHeight: calculateWindowHeight(), maxHeight: .infinity)
         .onAppear {
             loadConfig()
         }
+    }
+    
+    private func calculateWindowHeight() -> CGFloat {
+        let headerHeight: CGFloat = 100
+        let itemHeight: CGFloat = 55
+        let bottomSpacing: CGFloat = 20
+        let totalHeight = headerHeight + (CGFloat(itemCount) * itemHeight) + bottomSpacing
+        return max(totalHeight, 450)
     }
 
     private func handleButtonClick(index: Int) {
@@ -183,12 +222,14 @@ struct ContentView: View {
             return
         }
         if isAppBundle {
-            do {
-                _ = try NSWorkspace.shared.launchApplication(at: fileURL, options: [], configuration: [:])
-                logInfo("已打开 \(index + 1): \(filePath)")
-            } catch {
-                showAlert(title: L("warning"), message: error.localizedDescription)
-                logError("打开失败: \(error.localizedDescription)")
+            let config = NSWorkspace.OpenConfiguration()
+            NSWorkspace.shared.openApplication(at: fileURL, configuration: config) { (app, error) in
+                if let error = error {
+                    showAlert(title: L("warning"), message: error.localizedDescription)
+                    logError("打开失败: \(error.localizedDescription)")
+                } else {
+                    logInfo("已打开 \(index + 1): \(filePath)")
+                }
             }
         } else {
             if NSWorkspace.shared.open(fileURL) {
@@ -244,29 +285,22 @@ struct ContentView: View {
             print("DEBUG: 配置加载成功, itemCount=\(cfg.itemCount), lastOpenedFiles.count=\(cfg.lastOpenedFiles.count)")
             selectedFiles = cfg.lastOpenedFiles
             prefs = cfg.preferences
-            itemCount = cfg.itemCount
             
+            let newCount = cfg.itemCount
             let currentCount = selectedFiles.count
-            if currentCount < itemCount {
-                let additionalCount = itemCount - currentCount
+            
+            if currentCount < newCount {
+                let additionalCount = newCount - currentCount
                 selectedFiles.append(contentsOf: Array(repeating: "", count: additionalCount))
                 buttonLabels.append(contentsOf: Array(repeating: "select", count: additionalCount))
                 disabledButtons.append(contentsOf: Array(repeating: false, count: additionalCount))
-            } else if currentCount > itemCount {
-                selectedFiles = Array(selectedFiles.prefix(itemCount))
+            } else if currentCount > newCount {
+                selectedFiles = Array(selectedFiles.prefix(newCount))
+                buttonLabels = Array(buttonLabels.prefix(newCount))
+                disabledButtons = Array(disabledButtons.prefix(newCount))
             }
             
-            if buttonLabels.count < itemCount {
-                buttonLabels = Array(repeating: "select", count: itemCount)
-            } else {
-                buttonLabels = Array(buttonLabels.prefix(itemCount))
-            }
-            
-            if disabledButtons.count < itemCount {
-                disabledButtons = Array(repeating: false, count: itemCount)
-            } else {
-                disabledButtons = Array(disabledButtons.prefix(itemCount))
-            }
+            itemCount = newCount
             
             for i in 0..<min(itemCount, cfg.lastOpenedFiles.count) {
                 if !cfg.lastOpenedFiles[i].isEmpty {
@@ -318,7 +352,6 @@ struct ContentView: View {
 
     private func updateItemCount(_ newCount: Int) {
         let oldCount = itemCount
-        itemCount = newCount
         
         if newCount > oldCount {
             let additionalCount = newCount - oldCount
@@ -331,9 +364,29 @@ struct ContentView: View {
             disabledButtons = Array(disabledButtons.prefix(newCount))
         }
         
+        itemCount = newCount
         saveConfig()
         logInfo("项目数量已从 \(oldCount) 更新为 \(newCount)")
         print("DEBUG: itemCount=\(itemCount), selectedFiles.count=\(selectedFiles.count)")
+        
+        adjustWindowSize()
+    }
+    
+    private func adjustWindowSize() {
+        if let window = NSApp.keyWindow {
+            let headerHeight: CGFloat = 100
+            let itemHeight: CGFloat = 55
+            let bottomSpacing: CGFloat = 20
+            let totalHeight = headerHeight + (CGFloat(itemCount) * itemHeight) + bottomSpacing
+            let newHeight = max(totalHeight, 450)
+            
+            let currentFrame = window.frame
+            let newFrame = NSRect(x: currentFrame.origin.x, 
+                                  y: currentFrame.origin.y + currentFrame.height - newHeight,
+                                  width: currentFrame.width, 
+                                  height: newHeight)
+            window.setFrame(newFrame, display: true, animate: true)
+        }
     }
 
     private func resetApp() {

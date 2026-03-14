@@ -1,6 +1,6 @@
 # myPanel
 
-Version: 2.1.0
+Version: 2.1.1
 
 ## Overview
 
@@ -20,7 +20,7 @@ myPanel is a lightweight macOS application built with SwiftUI designed to manage
 
 ## Changelog
 
-### Version 2.1.0
+### Version 2.1.1
 
 #### New Features
 - Added dynamic item count feature: users can now set the number of items (1-50) in the panel
@@ -29,7 +29,7 @@ myPanel is a lightweight macOS application built with SwiftUI designed to manage
 - Improved backward compatibility with old configuration files
 
 #### Improvements
-- Updated version number to 2.1.0
+- Updated version number to 2.1.1
 - Updated creation date to 2026-02-25
 
 ### Version 2.0.1

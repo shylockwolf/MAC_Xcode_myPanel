@@ -1,7 +1,7 @@
 /* Localizable zh-Hans placeholders handled via Localizable.strings in zh-Hans.lproj folder */
 "app_title" = "myPanel";
 "author" = "Shylock Wolf";
-"version" = "v 2.1.0";
+"version" = "v 2.1.1";
 "date" = "2026-02-25";
 "reset_app" = "重置应用";
 "reset_confirm" = "这将清空所有配置并重置应用为初始状态。您确定要继续吗？";
