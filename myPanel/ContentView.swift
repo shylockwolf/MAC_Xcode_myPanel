@@ -95,7 +95,7 @@ struct ContentView: View {
                         Text("Shylock Wolf")
                             .font(.caption)
                             .foregroundColor(.gray)
-                        Text("ver 2.1.1")
+                        Text("ver 2.1.2")
                             .font(.caption)
                             .foregroundColor(.gray)
                         Text("2026-03")
@@ -287,16 +287,23 @@ struct ContentView: View {
             prefs = cfg.preferences
             
             let newCount = cfg.itemCount
-            let currentCount = selectedFiles.count
             
-            if currentCount < newCount {
-                let additionalCount = newCount - currentCount
-                selectedFiles.append(contentsOf: Array(repeating: "", count: additionalCount))
-                buttonLabels.append(contentsOf: Array(repeating: "select", count: additionalCount))
-                disabledButtons.append(contentsOf: Array(repeating: false, count: additionalCount))
-            } else if currentCount > newCount {
+            // 调整数组大小以匹配新的 itemCount
+            if selectedFiles.count < newCount {
+                selectedFiles.append(contentsOf: Array(repeating: "", count: newCount - selectedFiles.count))
+            } else if selectedFiles.count > newCount {
                 selectedFiles = Array(selectedFiles.prefix(newCount))
+            }
+            
+            if buttonLabels.count < newCount {
+                buttonLabels.append(contentsOf: Array(repeating: "select", count: newCount - buttonLabels.count))
+            } else if buttonLabels.count > newCount {
                 buttonLabels = Array(buttonLabels.prefix(newCount))
+            }
+            
+            if disabledButtons.count < newCount {
+                disabledButtons.append(contentsOf: Array(repeating: false, count: newCount - disabledButtons.count))
+            } else if disabledButtons.count > newCount {
                 disabledButtons = Array(disabledButtons.prefix(newCount))
             }
             
@@ -308,7 +315,7 @@ struct ContentView: View {
                     disabledButtons[i] = true
                 }
             }
-            print("DEBUG: 配置应用完成, itemCount=\(itemCount), selectedFiles.count=\(selectedFiles.count)")
+            print("DEBUG: 配置应用完成, itemCount=\(itemCount), selectedFiles.count=\(selectedFiles.count), buttonLabels.count=\(buttonLabels.count), disabledButtons.count=\(disabledButtons.count)")
             logInfo("Config loaded via ConfigManager, applying to UI")
         } else {
             print("DEBUG: 没有找到配置文件，使用默认值")
@@ -368,25 +375,6 @@ struct ContentView: View {
         saveConfig()
         logInfo("项目数量已从 \(oldCount) 更新为 \(newCount)")
         print("DEBUG: itemCount=\(itemCount), selectedFiles.count=\(selectedFiles.count)")
-        
-        adjustWindowSize()
-    }
-    
-    private func adjustWindowSize() {
-        if let window = NSApp.keyWindow {
-            let headerHeight: CGFloat = 100
-            let itemHeight: CGFloat = 55
-            let bottomSpacing: CGFloat = 20
-            let totalHeight = headerHeight + (CGFloat(itemCount) * itemHeight) + bottomSpacing
-            let newHeight = max(totalHeight, 450)
-            
-            let currentFrame = window.frame
-            let newFrame = NSRect(x: currentFrame.origin.x, 
-                                  y: currentFrame.origin.y + currentFrame.height - newHeight,
-                                  width: currentFrame.width, 
-                                  height: newHeight)
-            window.setFrame(newFrame, display: true, animate: true)
-        }
     }
 
     private func resetApp() {

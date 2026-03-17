@@ -1,6 +1,6 @@
 # myPanel
 
-Version: 2.1.1
+Version: 2.1.2
 
 ## Overview
 
@@ -19,6 +19,14 @@ myPanel is a lightweight macOS application built with SwiftUI designed to manage
 - Version information display
 
 ## Changelog
+
+### Version 2.1.2
+
+#### Bug Fixes
+- Fixed crash issue during application startup
+- Fixed index out of range error in loadConfig function
+- Improved array size adjustment for buttonLabels and disabledButtons arrays
+- Removed problematic adjustWindowSize function to avoid SwiftUI layout conflicts
 
 ### Version 2.1.1
 
