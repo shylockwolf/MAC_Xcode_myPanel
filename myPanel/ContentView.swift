@@ -26,6 +26,8 @@ struct ContentView: View {
     @State private var prefs = Preferences(theme: "default", language: "en")
     @State private var disabledButtons: [Bool] = Array(repeating: false, count: 9)
     @State private var itemCount: Int = 9
+    @State private var externalDrives: [URL] = []
+    @State private var showExternalDrives: Bool = false
 
     private let configFileURL: URL = {
         #if DEBUG
@@ -39,71 +41,126 @@ struct ContentView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 15) {
-                HStack {
-                    HStack(spacing: 5) {
-                        Text("数量")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                        Button(action: {
-                            print("DEBUG: 点击 - 按钮, 当前 itemCount=\(itemCount)")
-                            if itemCount > 1 {
-                                updateItemCount(itemCount - 1)
-                            } else {
-                                print("DEBUG: itemCount <= 1, 不能减少")
-                            }
-                        }) {
-                            Image(systemName: "minus")
-                                .font(.system(size: 12))
+                VStack(spacing: 0) {
+                    HStack {
+                        HStack(spacing: 5) {
+                            Text("数量")
+                                .font(.caption)
                                 .foregroundColor(.gray)
-                                .frame(width: 24, height: 24)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        Text("\(itemCount)")
-                            .font(.system(size: 14, weight: .medium))
-                            .frame(minWidth: 25)
-                        Button(action: {
-                            print("DEBUG: 点击 + 按钮, 当前 itemCount=\(itemCount)")
-                            if itemCount < 50 {
-                                updateItemCount(itemCount + 1)
-                            } else {
-                                print("DEBUG: itemCount >= 50, 不能增加")
+                            Button(action: {
+                                print("DEBUG: 点击 - 按钮, 当前 itemCount=\(itemCount)")
+                                if itemCount > 1 {
+                                    updateItemCount(itemCount - 1)
+                                } else {
+                                    print("DEBUG: itemCount <= 1, 不能减少")
+                                }
+                            }) {
+                                Image(systemName: "minus")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.gray)
+                                    .frame(width: 24, height: 24)
+                                    .contentShape(Rectangle())
                             }
-                        }) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 12))
-                                .foregroundColor(.gray)
-                                .frame(width: 24, height: 24)
-                                .contentShape(Rectangle())
+                            .buttonStyle(PlainButtonStyle())
+                            Text("\(itemCount)")
+                                .font(.system(size: 14, weight: .medium))
+                                .frame(minWidth: 25)
+                            Button(action: {
+                                print("DEBUG: 点击 + 按钮, 当前 itemCount=\(itemCount)")
+                                if itemCount < 50 {
+                                    updateItemCount(itemCount + 1)
+                                } else {
+                                    print("DEBUG: itemCount >= 50, 不能增加")
+                                }
+                            }) {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.gray)
+                                    .frame(width: 24, height: 24)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(PlainButtonStyle())
                         }
-                        .buttonStyle(PlainButtonStyle())
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(8)
+
+                        Spacer()
+
+                        Text("myPanel")
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+
+                        Spacer()
+
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("Shylock Wolf")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                            Text("ver 3.0.0")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                            Text("2026-04")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.gray.opacity(0.1))
-                    .cornerRadius(8)
-
-                    Spacer()
-
-                    Text("myPanel")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-
-                    Spacer()
-
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("Shylock Wolf")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                        Text("ver 2.1.2")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                        Text("2026-03")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                    }
+                    .padding(.horizontal, 20)
                 }
-                .padding(.top, 20)
+                .padding(.top, 5)
+
+                // 外接磁盘显示区域
+                HStack(spacing: 10) {
+                    Button(action: {
+                        ejectAllDrives()
+                    }) {
+                        Image(systemName: "eject.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(externalDrives.isEmpty ? .gray : .blue)
+                            .frame(width: 32, height: 32)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .disabled(externalDrives.isEmpty)
+                    .help(externalDrives.isEmpty ? "无外接设备" : "点击弹出所有外接设备")
+
+                    if externalDrives.isEmpty {
+                        Text("无外接设备")
+                            .font(.system(size: 12))
+                            .foregroundColor(.gray)
+                            .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+                            .padding(.horizontal, 10)
+                            .background(Color.gray.opacity(0.1))
+                            .cornerRadius(6)
+                    } else {
+                        HStack(spacing: 6) {
+                            ForEach(externalDrives, id: \.self) { driveURL in
+                                Button(action: {
+                                    ejectDrive(driveURL)
+                                }) {
+                                    VStack(spacing: 1) {
+                                        Image(nsImage: NSWorkspace.shared.icon(forFile: driveURL.path))
+                                            .resizable()
+                                            .frame(width: 16, height: 16)
+                                        Text(driveURL.lastPathComponent)
+                                            .font(.system(size: 8))
+                                            .foregroundColor(.primary)
+                                            .lineLimit(1)
+                                            .truncationMode(.tail)
+                                    }
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                                .help("弹出 \(driveURL.lastPathComponent)")
+                            }
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+                        .padding(.horizontal, 10)
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(6)
+                    }
+
+                    Spacer().frame(width: 16)
+                }
                 .padding(.horizontal, 20)
 
                 ForEach(0..<itemCount, id: \.self) { idx in
@@ -159,14 +216,16 @@ struct ContentView: View {
                minHeight: 450, idealHeight: calculateWindowHeight(), maxHeight: .infinity)
         .onAppear {
             loadConfig()
+            refreshExternalDrives()
         }
     }
     
     private func calculateWindowHeight() -> CGFloat {
         let headerHeight: CGFloat = 100
+        let externalDriveHeight: CGFloat = 55
         let itemHeight: CGFloat = 55
         let bottomSpacing: CGFloat = 20
-        let totalHeight = headerHeight + (CGFloat(itemCount) * itemHeight) + bottomSpacing
+        let totalHeight = headerHeight + externalDriveHeight + (CGFloat(itemCount) * itemHeight) + bottomSpacing
         return max(totalHeight, 450)
     }
 
@@ -390,6 +449,69 @@ struct ContentView: View {
         } catch {
             logError("重置应用失败: \(error.localizedDescription)")
             showAlert(title: L("reset_app"), message: error.localizedDescription)
+        }
+    }
+    
+    private func refreshExternalDrives() {
+        var drives: [URL] = []
+        
+        // 获取所有挂载的卷
+        guard let mountedVolumes = FileManager.default.mountedVolumeURLs(includingResourceValuesForKeys: nil, options: []) else {
+            externalDrives = []
+            return
+        }
+        
+        for volumeURL in mountedVolumes {
+            let path = volumeURL.path
+            
+            // 外接设备通常挂载在 /Volumes/ 下
+            // 排除根目录和系统目录
+            if path.hasPrefix("/Volumes/") && path != "/" {
+                drives.append(volumeURL)
+                logInfo("检测到外接设备: \(path)")
+            }
+        }
+        
+        externalDrives = drives
+        logInfo("共检测到 \(drives.count) 个外接设备")
+    }
+    
+    private func ejectDrive(_ driveURL: URL) {
+        Task {
+            do {
+                try await NSWorkspace.shared.unmountAndEjectDevice(at: driveURL)
+                logInfo("已弹出设备: \(driveURL.path)")
+            } catch {
+                logError("弹出设备失败: \(error.localizedDescription)")
+                await MainActor.run {
+                    self.showAlert(title: "弹出失败", message: error.localizedDescription)
+                }
+            }
+        }
+    }
+    
+    private func ejectAllDrives() {
+        let drivesToEject = externalDrives
+        Task {
+            var failedDrives: [(URL, String)] = []
+            
+            for driveURL in drivesToEject {
+                do {
+                    try await NSWorkspace.shared.unmountAndEjectDevice(at: driveURL)
+                    logInfo("已弹出设备: \(driveURL.path)")
+                } catch {
+                    logError("弹出设备失败: \(driveURL.path) - \(error.localizedDescription)")
+                    failedDrives.append((driveURL, error.localizedDescription))
+                }
+            }
+            
+            await MainActor.run {
+                self.refreshExternalDrives()
+                if !failedDrives.isEmpty {
+                    let messages = failedDrives.map { "\($0.0.lastPathComponent): \($0.1)" }.joined(separator: "\n")
+                    self.showAlert(title: "部分设备弹出失败", message: messages)
+                }
+            }
         }
     }
 }

@@ -1,6 +1,6 @@
 # myPanel
 
-Version: 2.1.2
+Version: 3.0.0
 
 ## Overview
 
@@ -8,17 +8,31 @@ myPanel is a lightweight macOS application built with SwiftUI designed to manage
 
 ## Features
 
-- Quick file and application access panel (9 slots)
+- Quick file and application access panel (configurable 1-50 slots)
 - Persistent storage of last opened files
 - Customizable preferences (theme and language)
 - Support for both regular files and .app applications
 - File/application icon display for each item
 - Individual item clear/reset functionality
 - Global reset functionality to clear all configuration
+- External drive detection and ejection
 - Clean and intuitive user interface with consistent layout
 - Version information display
 
 ## Changelog
+
+### Version 3.0.0
+
+#### New Features
+- Added external drive detection and management
+- Display all mounted external drives in a dedicated area
+- One-click eject for all external drives
+- Individual eject for each external drive
+- Improved header layout with better version info positioning
+
+#### Improvements
+- Updated version number to 3.0.0
+- Updated date to 2026-04
 
 ### Version 2.1.2
 
