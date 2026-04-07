@@ -28,6 +28,7 @@ struct ContentView: View {
     @State private var itemCount: Int = 9
     @State private var externalDrives: [URL] = []
     @State private var showExternalDrives: Bool = false
+    @State private var isEjecting: Bool = false
 
     private let configFileURL: URL = {
         #if DEBUG
@@ -98,7 +99,7 @@ struct ContentView: View {
                             Text("Shylock Wolf")
                                 .font(.caption)
                                 .foregroundColor(.gray)
-                            Text("ver 3.0.1")
+                            Text("ver 3.0.2")
                                 .font(.caption)
                                 .foregroundColor(.gray)
                             Text("2026-04")
@@ -117,12 +118,12 @@ struct ContentView: View {
                     }) {
                         Image(systemName: "eject.fill")
                             .font(.system(size: 20))
-                            .foregroundColor(externalDrives.isEmpty ? .gray : .blue)
+                            .foregroundColor(externalDrives.isEmpty ? .gray : (isEjecting ? .yellow : .blue))
                             .frame(width: 32, height: 32)
                     }
                     .buttonStyle(PlainButtonStyle())
-                    .disabled(externalDrives.isEmpty)
-                    .help(externalDrives.isEmpty ? "无外接设备" : "点击弹出所有外接设备")
+                    .disabled(externalDrives.isEmpty || isEjecting)
+                    .help(externalDrives.isEmpty ? "无外接设备" : (isEjecting ? "正在弹出..." : "点击弹出所有外接设备"))
 
                     if externalDrives.isEmpty {
                         Text("无外接设备")
@@ -159,7 +160,16 @@ struct ContentView: View {
                         .cornerRadius(6)
                     }
 
-                    Spacer().frame(width: 16)
+                    Button(action: {
+                        refreshExternalDrives()
+                    }) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 16))
+                            .foregroundColor(.gray)
+                            .frame(width: 32, height: 32)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .help("刷新外接设备")
                 }
                 .padding(.horizontal, 20)
 
@@ -528,8 +538,12 @@ struct ContentView: View {
     }
     
     private func ejectAllDrives() {
-        let drivesToEject = externalDrives
         Task {
+            await MainActor.run {
+                isEjecting = true
+            }
+            
+            let drivesToEject = externalDrives
             var failedDrives: [(URL, String)] = []
             
             for driveURL in drivesToEject {
@@ -589,6 +603,7 @@ struct ContentView: View {
                     let messages = stillFailed.map { "\($0.0.lastPathComponent): 弹出超时（等待10秒）" }.joined(separator: "\n")
                     self.showAlert(title: "部分设备弹出失败", message: messages)
                 }
+                isEjecting = false
             }
         }
     }

@@ -1,6 +1,6 @@
 # myPanel
 
-Version: 3.0.1
+Version: 3.0.2
 
 ## Overview
 
@@ -20,6 +20,17 @@ myPanel is a lightweight macOS application built with SwiftUI designed to manage
 - Version information display
 
 ## Changelog
+
+### Version 3.0.2
+
+#### New Features
+- Added refresh button for external drives
+- Added visual feedback for eject button (turns yellow during ejection process)
+
+#### Improvements
+- Updated version number to 3.0.2
+- Enhanced user experience with better visual feedback
+- Improved external drive management interface
 
 ### Version 3.0.1
 
