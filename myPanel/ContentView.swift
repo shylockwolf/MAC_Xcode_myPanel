@@ -98,7 +98,7 @@ struct ContentView: View {
                             Text("Shylock Wolf")
                                 .font(.caption)
                                 .foregroundColor(.gray)
-                            Text("ver 3.0.0")
+                            Text("ver 3.0.1")
                                 .font(.caption)
                                 .foregroundColor(.gray)
                             Text("2026-04")
@@ -481,10 +481,47 @@ struct ContentView: View {
             do {
                 try await NSWorkspace.shared.unmountAndEjectDevice(at: driveURL)
                 logInfo("已弹出设备: \(driveURL.path)")
-            } catch {
-                logError("弹出设备失败: \(error.localizedDescription)")
                 await MainActor.run {
-                    self.showAlert(title: "弹出失败", message: error.localizedDescription)
+                    self.refreshExternalDrives()
+                }
+            } catch {
+                // 检查是否是 OSStatus error -35 (nsvErr - No Such Volume)
+                // 这个错误表示卷已经不存在，意味着磁盘已经弹出或被卸载
+                let nsError = error as NSError
+                if nsError.domain == "NSOSStatusErrorDomain" && nsError.code == -35 {
+                    logInfo("磁盘已不存在（可能已被系统卸载）: \(driveURL.path)")
+                    await MainActor.run {
+                        self.refreshExternalDrives()
+                    }
+                    return // 视为成功，不显示错误
+                }
+                
+                logError("弹出设备失败（初始）: \(error.localizedDescription)")
+                
+                // 每2秒检查一次，最多检查5次（共10秒）
+                var ejected = false
+                for attempt in 1...5 {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000) // 等待 2 秒
+                    logInfo("检查磁盘状态（第\(attempt)次，共5次）: \(driveURL.path)")
+                    
+                    await MainActor.run {
+                        self.refreshExternalDrives()
+                    }
+                    
+                    // 检查磁盘是否还在
+                    if !self.externalDrives.contains(driveURL) {
+                        ejected = true
+                        logInfo("磁盘实际已成功弹出: \(driveURL.path)")
+                        break
+                    }
+                }
+                
+                // 如果10秒后磁盘还在，显示错误
+                if !ejected {
+                    await MainActor.run {
+                        logError("磁盘弹出超时（10秒）: \(driveURL.path)")
+                        self.showAlert(title: "弹出失败", message: "磁盘弹出超时（等待10秒）: \(driveURL.lastPathComponent)")
+                    }
                 }
             }
         }
@@ -500,15 +537,56 @@ struct ContentView: View {
                     try await NSWorkspace.shared.unmountAndEjectDevice(at: driveURL)
                     logInfo("已弹出设备: \(driveURL.path)")
                 } catch {
-                    logError("弹出设备失败: \(driveURL.path) - \(error.localizedDescription)")
+                    // 检查是否是 OSStatus error -35 (nsvErr - No Such Volume)
+                    let nsError = error as NSError
+                    if nsError.domain == "NSOSStatusErrorDomain" && nsError.code == -35 {
+                        logInfo("磁盘已不存在（可能已被系统卸载）: \(driveURL.path)")
+                        continue // 跳过，视为成功
+                    }
+                    
+                    logError("弹出设备失败（初始）: \(driveURL.path) - \(error.localizedDescription)")
+                    // 记录失败的驱动器，稍后会再次检查
                     failedDrives.append((driveURL, error.localizedDescription))
                 }
             }
             
+            // 每2秒检查一次失败的驱动器，最多检查5次（共10秒）
+            var stillFailed: [(URL, String)] = failedDrives
+            
+            for attempt in 1...5 {
+                if stillFailed.isEmpty {
+                    break // 所有磁盘都已成功弹出
+                }
+                
+                try? await Task.sleep(nanoseconds: 2_000_000_000) // 等待 2 秒
+                logInfo("批量检查磁盘状态（第\(attempt)次，共5次）")
+                
+                // 刷新驱动器列表
+                await MainActor.run {
+                    self.refreshExternalDrives()
+                }
+                
+                // 检查失败的驱动器是否已弹出
+                var newStillFailed: [(URL, String)] = []
+                for (driveURL, errorMsg) in stillFailed {
+                    if self.externalDrives.contains(driveURL) {
+                        // 驱动器还在列表中，继续等待
+                        newStillFailed.append((driveURL, errorMsg))
+                    } else {
+                        // 驱动器已不在列表中，实际成功
+                        logInfo("磁盘实际已成功弹出: \(driveURL.path)")
+                    }
+                }
+                stillFailed = newStillFailed
+            }
+            
+            // 如果10秒后还有磁盘未弹出，显示错误
             await MainActor.run {
-                self.refreshExternalDrives()
-                if !failedDrives.isEmpty {
-                    let messages = failedDrives.map { "\($0.0.lastPathComponent): \($0.1)" }.joined(separator: "\n")
+                if !stillFailed.isEmpty {
+                    for (driveURL, _) in stillFailed {
+                        logError("磁盘弹出超时（10秒）: \(driveURL.path)")
+                    }
+                    let messages = stillFailed.map { "\($0.0.lastPathComponent): 弹出超时（等待10秒）" }.joined(separator: "\n")
                     self.showAlert(title: "部分设备弹出失败", message: messages)
                 }
             }

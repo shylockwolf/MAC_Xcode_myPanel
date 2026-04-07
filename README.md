@@ -1,6 +1,6 @@
 # myPanel
 
-Version: 3.0.0
+Version: 3.0.1
 
 ## Overview
 
@@ -20,6 +20,19 @@ myPanel is a lightweight macOS application built with SwiftUI designed to manage
 - Version information display
 
 ## Changelog
+
+### Version 3.0.1
+
+#### Bug Fixes
+- Fixed false positive error alerts when disk ejection actually succeeds
+- Improved disk ejection detection with 2-second polling interval (max 10 seconds timeout)
+- Added special handling for OSStatus error -35 (No Such Volume) to recognize already-ejected disks
+- Enhanced error logging with detailed attempt information
+
+#### Improvements
+- Updated version number to 3.0.1
+- Improved user experience with immediate UI updates when disks are ejected
+- Better timeout handling with clear error messages
 
 ### Version 3.0.0
 
