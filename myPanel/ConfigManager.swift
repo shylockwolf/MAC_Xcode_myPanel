@@ -21,15 +21,55 @@ private func logError(_ msg: String) { print("ERROR: \(msg)") }
 
 public final class ConfigManager {
     public static let shared = ConfigManager()
-    private init() {}
+    private init() {
+        migrateFromSandboxIfNeeded()
+    }
 
-private var configURL: URL {
-        #if DEBUG
-        let currentPath = FileManager.default.currentDirectoryPath
-        return URL(fileURLWithPath: currentPath).appendingPathComponent("myPanel.json")
-        #else
+    private var configURL: URL {
+        // 统一使用 Documents 目录，确保配置持久化
         return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("myPanel.json")
-        #endif
+    }
+    
+    private func migrateFromSandboxIfNeeded() {
+        let userDocsURL = configURL
+        
+        // 如果已经存在配置文件，不需要迁移
+        if FileManager.default.fileExists(atPath: userDocsURL.path) {
+            return
+        }
+        
+        // 获取用户主目录
+        let homeDir = FileManager.default.homeDirectoryForCurrentUser
+        
+        // 尝试从多个可能的位置迁移配置
+        let possiblePaths = [
+            // 沙盒Data目录下的配置文件
+            homeDir.appendingPathComponent("Library/Containers/shylockwolf.myPanel/Data/myPanel.json"),
+            // 沙盒Documents目录
+            homeDir.appendingPathComponent("Library/Containers/shylockwolf.myPanel/Data/Documents/myPanel.json"),
+            // 项目目录（旧DEBUG模式位置）
+            URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("myPanel.json"),
+            // 旧版应用支持目录
+            FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?.appendingPathComponent("myPanel/myPanel.json")
+        ].compactMap { $0 }
+        
+        for sourceURL in possiblePaths {
+            let path = sourceURL.path
+            if FileManager.default.fileExists(atPath: path) {
+                do {
+                    // 确保目标目录存在
+                    let targetDir = userDocsURL.deletingLastPathComponent()
+                    try FileManager.default.createDirectory(at: targetDir, withIntermediateDirectories: true)
+                    
+                    // 复制文件
+                    try FileManager.default.copyItem(at: sourceURL, to: userDocsURL)
+                    logInfo("成功迁移配置: \(path) -> \(userDocsURL.path)")
+                    return
+                } catch {
+                    logError("从 \(path) 迁移失败: \(error.localizedDescription)")
+                }
+            }
+        }
     }
 
     public func loadConfig() -> AppConfig? {
@@ -76,5 +116,23 @@ private var configURL: URL {
         } catch {
             logError("Save failed: \(error.localizedDescription)")
         }
+    }
+    
+    public func deleteConfig() -> Bool {
+        guard FileManager.default.fileExists(atPath: configURL.path) else {
+            return true
+        }
+        do {
+            try FileManager.default.removeItem(at: configURL)
+            logInfo("Deleted config at: \(configURL.path)")
+            return true
+        } catch {
+            logError("Delete failed: \(error.localizedDescription)")
+            return false
+        }
+    }
+    
+    public var currentConfigPath: String {
+        return configURL.path
     }
 }

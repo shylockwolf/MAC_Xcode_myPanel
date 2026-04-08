@@ -1,6 +1,6 @@
 # myPanel
 
-Version: 3.0.2
+Version: 3.0.3
 
 ## Overview
 
@@ -20,6 +20,18 @@ myPanel is a lightweight macOS application built with SwiftUI designed to manage
 - Version information display
 
 ## Changelog
+
+### Version 3.0.3
+
+#### Bug Fixes
+- Fixed compilation errors with async/await syntax
+- Fixed missing Combine import for ObservableObject
+
+#### Improvements
+- Updated version number to 3.0.3
+- Improved external drive ejection progress window (now a separate floating window)
+- Simplified ejection log display - only shows final results, not intermediate checks
+- Added 1024x1024 app icon for macOS requirements
 
 ### Version 3.0.2
 

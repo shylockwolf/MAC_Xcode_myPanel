@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import Combine
 
 #if canImport(os)
 import os
@@ -29,19 +30,12 @@ struct ContentView: View {
     @State private var externalDrives: [URL] = []
     @State private var showExternalDrives: Bool = false
     @State private var isEjecting: Bool = false
-
-    private let configFileURL: URL = {
-        #if DEBUG
-        let currentDirectory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-        return currentDirectory.appendingPathComponent("myPanel.json")
-        #else
-        return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("myPanel.json")
-        #endif
-    }()
+    @StateObject private var ejectionWindowController = EjectionProgressWindowController()
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 15) {
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(spacing: 15) {
                 VStack(spacing: 0) {
                     HStack {
                         HStack(spacing: 5) {
@@ -99,7 +93,7 @@ struct ContentView: View {
                             Text("Shylock Wolf")
                                 .font(.caption)
                                 .foregroundColor(.gray)
-                            Text("ver 3.0.2")
+                            Text("ver 3.0.3")
                                 .font(.caption)
                                 .foregroundColor(.gray)
                             Text("2026-04")
@@ -126,13 +120,24 @@ struct ContentView: View {
                     .help(externalDrives.isEmpty ? "无外接设备" : (isEjecting ? "正在弹出..." : "点击弹出所有外接设备"))
 
                     if externalDrives.isEmpty {
-                        Text("无外接设备")
-                            .font(.system(size: 12))
-                            .foregroundColor(.gray)
-                            .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
-                            .padding(.horizontal, 10)
-                            .background(Color.gray.opacity(0.1))
-                            .cornerRadius(6)
+                        HStack {
+                            Text("无外接设备")
+                                .font(.system(size: 12))
+                                .foregroundColor(.gray)
+                            Spacer()
+                            Button(action: {
+                                refreshExternalDrives()
+                            }) {
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.gray)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+                        .padding(.horizontal, 10)
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(6)
                     } else {
                         HStack(spacing: 6) {
                             ForEach(externalDrives, id: \.self) { driveURL in
@@ -153,23 +158,24 @@ struct ContentView: View {
                                 .buttonStyle(PlainButtonStyle())
                                 .help("弹出 \(driveURL.lastPathComponent)")
                             }
+                            
+                            Spacer()
+                            
+                            Button(action: {
+                                refreshExternalDrives()
+                            }) {
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.gray)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .help("刷新")
                         }
                         .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
                         .padding(.horizontal, 10)
                         .background(Color.gray.opacity(0.1))
                         .cornerRadius(6)
                     }
-
-                    Button(action: {
-                        refreshExternalDrives()
-                    }) {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 16))
-                            .foregroundColor(.gray)
-                            .frame(width: 32, height: 32)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .help("刷新外接设备")
                 }
                 .padding(.horizontal, 20)
 
@@ -222,10 +228,23 @@ struct ContentView: View {
                 Spacer().frame(height: 20)
             }
         }
+        }
         .frame(minWidth: 350, idealWidth: 350, maxWidth: .infinity,
                minHeight: 450, idealHeight: calculateWindowHeight(), maxHeight: .infinity)
         .onAppear {
             loadConfig()
+            refreshExternalDrives()
+        }
+        .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didMountNotification)) { notification in
+            logInfo("收到挂载通知: \(notification.userInfo ?? [:])")
+            refreshExternalDrives()
+        }
+        .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didUnmountNotification)) { notification in
+            logInfo("收到卸载通知: \(notification.userInfo ?? [:])")
+            refreshExternalDrives()
+        }
+        .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didRenameVolumeNotification)) { notification in
+            logInfo("收到卷重命名通知: \(notification.userInfo ?? [:])")
             refreshExternalDrives()
         }
     }
@@ -238,7 +257,7 @@ struct ContentView: View {
         let totalHeight = headerHeight + externalDriveHeight + (CGFloat(itemCount) * itemHeight) + bottomSpacing
         return max(totalHeight, 450)
     }
-
+    
     private func handleButtonClick(index: Int) {
         if selectedFiles[index].isEmpty {
             selectFile(index: index)
@@ -246,13 +265,13 @@ struct ContentView: View {
             openFile(index: index)
         }
     }
-
+    
     private func clearItem(index: Int) {
         selectedFiles[index] = ""
         buttonLabels[index] = "select"
         saveConfig()
     }
-
+    
     private func selectFile(index: Int) {
         let panel = NSOpenPanel()
         panel.title = "选择文件 \(index + 1)"
@@ -276,7 +295,7 @@ struct ContentView: View {
             }
         }
     }
-
+    
     private func openFile(index: Int) {
         let filePath = selectedFiles[index]
         guard !filePath.isEmpty else {
@@ -309,7 +328,7 @@ struct ContentView: View {
             }
         }
     }
-
+    
     private func getFileName(for index: Int) -> String {
         let filePath = selectedFiles[index]
         if filePath.isEmpty {
@@ -318,13 +337,13 @@ struct ContentView: View {
             return URL(fileURLWithPath: filePath).lastPathComponent
         }
     }
-
+    
     private func getFileIcon(for index: Int) -> NSImage? {
         let filePath = selectedFiles[index]
         guard !filePath.isEmpty else { return nil }
         return NSWorkspace.shared.icon(forFile: filePath)
     }
-
+    
     private func saveConfig() {
         var lastModifiedTimes: [TimeInterval] = []
         for filePath in selectedFiles {
@@ -347,7 +366,7 @@ struct ContentView: View {
         let cfg = AppConfig(lastOpenedFiles: selectedFiles, preferences: prefs, lastModifiedTimes: lastModifiedTimes, itemCount: itemCount)
         ConfigManager.shared.saveConfig(cfg)
     }
-
+    
     private func loadConfig() {
         print("DEBUG: 开始加载配置")
         if let cfg = ConfigManager.shared.loadConfig() {
@@ -394,7 +413,7 @@ struct ContentView: View {
             disabledButtons = Array(repeating: false, count: itemCount)
         }
     }
-
+    
     private func showAlert(title: String, message: String) {
         let alert = NSAlert()
         alert.messageText = title
@@ -403,7 +422,7 @@ struct ContentView: View {
         alert.addButton(withTitle: L("ok"))
         alert.runModal()
     }
-
+    
     private func showResetConfirmation() {
         let alert = NSAlert()
         alert.messageText = "设置项目数量"
@@ -425,7 +444,7 @@ struct ContentView: View {
             }
         }
     }
-
+    
     private func updateItemCount(_ newCount: Int) {
         let oldCount = itemCount
         
@@ -445,20 +464,16 @@ struct ContentView: View {
         logInfo("项目数量已从 \(oldCount) 更新为 \(newCount)")
         print("DEBUG: itemCount=\(itemCount), selectedFiles.count=\(selectedFiles.count)")
     }
-
+    
     private func resetApp() {
-        do {
-            if FileManager.default.fileExists(atPath: configFileURL.path) {
-                try FileManager.default.removeItem(at: configFileURL)
-                logInfo("已删除配置文件: \(configFileURL.path)")
-            }
+        let success = ConfigManager.shared.deleteConfig()
+        if success {
             selectedFiles = Array(repeating: "", count: itemCount)
             buttonLabels = Array(repeating: "select", count: itemCount)
             disabledButtons = Array(repeating: false, count: itemCount)
             showAlert(title: L("reset_app"), message: L("reset_success"))
-        } catch {
-            logError("重置应用失败: \(error.localizedDescription)")
-            showAlert(title: L("reset_app"), message: error.localizedDescription)
+        } else {
+            showAlert(title: L("reset_app"), message: "删除配置文件失败")
         }
     }
     
@@ -467,18 +482,31 @@ struct ContentView: View {
         
         // 获取所有挂载的卷
         guard let mountedVolumes = FileManager.default.mountedVolumeURLs(includingResourceValuesForKeys: nil, options: []) else {
+            logError("无法获取挂载卷列表")
             externalDrives = []
             return
         }
         
+        logInfo("检测到 \(mountedVolumes.count) 个挂载卷")
+        
         for volumeURL in mountedVolumes {
             let path = volumeURL.path
+            // 解析符号链接获取真实路径
+            let resolvedPath = volumeURL.resolvingSymlinksInPath().path
             
-            // 外接设备通常挂载在 /Volumes/ 下
-            // 排除根目录和系统目录
-            if path.hasPrefix("/Volumes/") && path != "/" {
+            logInfo("检查卷: \(path), 解析后: \(resolvedPath)")
+            
+            // 检查是否是外接设备
+            // 1. 路径以 /Volumes/ 开头（符号链接路径）
+            // 2. 或解析后的路径以 /Volumes/ 开头
+            // 3. 排除根目录
+            let isExternal = (path.hasPrefix("/Volumes/") || resolvedPath.hasPrefix("/Volumes/")) 
+                             && path != "/" 
+                             && resolvedPath != "/"
+            
+            if isExternal {
                 drives.append(volumeURL)
-                logInfo("检测到外接设备: \(path)")
+                logInfo("添加外接设备: \(volumeURL.lastPathComponent)")
             }
         }
         
@@ -489,7 +517,7 @@ struct ContentView: View {
     private func ejectDrive(_ driveURL: URL) {
         Task {
             do {
-                try await NSWorkspace.shared.unmountAndEjectDevice(at: driveURL)
+                try NSWorkspace.shared.unmountAndEjectDevice(at: driveURL)
                 logInfo("已弹出设备: \(driveURL.path)")
                 await MainActor.run {
                     self.refreshExternalDrives()
@@ -538,73 +566,194 @@ struct ContentView: View {
     }
     
     private func ejectAllDrives() {
+        isEjecting = true
+        var logs: [String] = ["开始弹出所有外接设备..."]
+        ejectionWindowController.updateLogs(logs)
+        ejectionWindowController.showWindow()
+        
         Task {
-            await MainActor.run {
-                isEjecting = true
-            }
-            
             let drivesToEject = externalDrives
             var failedDrives: [(URL, String)] = []
             
             for driveURL in drivesToEject {
+                logs.append("正在弹出: \(driveURL.lastPathComponent)")
+                await MainActor.run {
+                    ejectionWindowController.updateLogs(logs)
+                }
+                
                 do {
-                    try await NSWorkspace.shared.unmountAndEjectDevice(at: driveURL)
+                    try NSWorkspace.shared.unmountAndEjectDevice(at: driveURL)
                     logInfo("已弹出设备: \(driveURL.path)")
+                    logs.append("✓ 成功弹出: \(driveURL.lastPathComponent)")
+                    await MainActor.run {
+                        ejectionWindowController.updateLogs(logs)
+                    }
                 } catch {
-                    // 检查是否是 OSStatus error -35 (nsvErr - No Such Volume)
                     let nsError = error as NSError
                     if nsError.domain == "NSOSStatusErrorDomain" && nsError.code == -35 {
                         logInfo("磁盘已不存在（可能已被系统卸载）: \(driveURL.path)")
-                        continue // 跳过，视为成功
+                        logs.append("⚠ 磁盘已不存在: \(driveURL.lastPathComponent)")
+                        await MainActor.run {
+                            ejectionWindowController.updateLogs(logs)
+                        }
+                        continue
                     }
                     
                     logError("弹出设备失败（初始）: \(driveURL.path) - \(error.localizedDescription)")
-                    // 记录失败的驱动器，稍后会再次检查
+                    // 不在窗口显示，只记录到失败列表
                     failedDrives.append((driveURL, error.localizedDescription))
                 }
             }
             
-            // 每2秒检查一次失败的驱动器，最多检查5次（共10秒）
             var stillFailed: [(URL, String)] = failedDrives
             
-            for attempt in 1...5 {
-                if stillFailed.isEmpty {
-                    break // 所有磁盘都已成功弹出
-                }
-                
-                try? await Task.sleep(nanoseconds: 2_000_000_000) // 等待 2 秒
-                logInfo("批量检查磁盘状态（第\(attempt)次，共5次）")
-                
-                // 刷新驱动器列表
-                await MainActor.run {
-                    self.refreshExternalDrives()
-                }
-                
-                // 检查失败的驱动器是否已弹出
-                var newStillFailed: [(URL, String)] = []
-                for (driveURL, errorMsg) in stillFailed {
-                    if self.externalDrives.contains(driveURL) {
-                        // 驱动器还在列表中，继续等待
-                        newStillFailed.append((driveURL, errorMsg))
-                    } else {
-                        // 驱动器已不在列表中，实际成功
-                        logInfo("磁盘实际已成功弹出: \(driveURL.path)")
+            if !stillFailed.isEmpty {
+                for attempt in 1...5 {
+                    if stillFailed.isEmpty {
+                        break
                     }
+                    
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    logInfo("批量检查磁盘状态（第\(attempt)次，共5次）")
+                    
+                    await MainActor.run {
+                        self.refreshExternalDrives()
+                    }
+                    
+                    var newStillFailed: [(URL, String)] = []
+                    for (driveURL, errorMsg) in stillFailed {
+                        if self.externalDrives.contains(driveURL) {
+                            newStillFailed.append((driveURL, errorMsg))
+                        } else {
+                            logInfo("磁盘实际已成功弹出: \(driveURL.path)")
+                            logs.append("✓ 成功弹出: \(driveURL.lastPathComponent)")
+                            await MainActor.run {
+                                ejectionWindowController.updateLogs(logs)
+                            }
+                        }
+                    }
+                    stillFailed = newStillFailed
                 }
-                stillFailed = newStillFailed
             }
             
-            // 如果10秒后还有磁盘未弹出，显示错误
             await MainActor.run {
                 if !stillFailed.isEmpty {
                     for (driveURL, _) in stillFailed {
                         logError("磁盘弹出超时（10秒）: \(driveURL.path)")
+                        logs.append("✗ 弹出失败: \(driveURL.lastPathComponent)")
                     }
-                    let messages = stillFailed.map { "\($0.0.lastPathComponent): 弹出超时（等待10秒）" }.joined(separator: "\n")
+                    logs.append("\n部分设备弹出失败")
+                    let messages = stillFailed.map { "\($0.0.lastPathComponent)" }.joined(separator: "\n")
                     self.showAlert(title: "部分设备弹出失败", message: messages)
+                    // 刷新外接设备列表（仅在有失败时刷新以显示剩余设备）
+                    self.refreshExternalDrives()
+                } else {
+                    logs.append("\n所有设备已成功弹出")
+                    // 直接清空列表，恢复到初始状态
+                    self.externalDrives = []
                 }
-                isEjecting = false
+                
+                ejectionWindowController.updateLogs(logs)
+                
+                // 延迟关闭窗口
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    self.ejectionWindowController.closeWindow()
+                    self.isEjecting = false
+                }
             }
+        }
+    }
+    
+    // 根据日志内容返回不同的颜色
+    private func getLogTextColor(_ log: String) -> Color {
+        if log.contains("✓") {
+            return .green
+        } else if log.contains("✗") {
+            return .red
+        } else if log.contains("⚠") {
+            return .orange
+        } else {
+            return .primary
+        }
+    }
+}
+
+// 弹出进度窗口控制器
+class EjectionProgressWindowController: ObservableObject {
+    private var window: NSPanel?
+    @Published var logs: [String] = []
+    
+    func showWindow() {
+        let panel = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        panel.title = "弹出设备进度"
+        panel.isFloatingPanel = true
+        panel.level = .floating
+        
+        let contentView = EjectionProgressView(logs: logs)
+        let hostingView = NSHostingView(rootView: contentView)
+        panel.contentView = hostingView
+        
+        window = panel
+        window?.center()
+        window?.makeKeyAndOrderFront(nil)
+    }
+    
+    func updateLogs(_ newLogs: [String]) {
+        logs = newLogs
+        if let hostingView = window?.contentView as? NSHostingView<EjectionProgressView> {
+            hostingView.rootView = EjectionProgressView(logs: newLogs)
+        }
+    }
+    
+    func closeWindow() {
+        window?.close()
+        window = nil
+    }
+}
+
+struct EjectionProgressView: View {
+    let logs: [String]
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 5) {
+                    ForEach(logs, id: \.self) { log in
+                        Text(log)
+                            .font(.system(size: 12))
+                            .foregroundColor(getLogTextColor(log))
+                    }
+                }
+                .padding()
+            }
+            .frame(maxHeight: .infinity)
+            
+            HStack {
+                Spacer()
+                Text("正在处理...")
+                    .font(.footnote)
+                    .foregroundColor(.gray)
+                Spacer()
+            }
+            .padding(.bottom, 10)
+        }
+        .frame(width: 400, height: 280)
+    }
+    
+    private func getLogTextColor(_ log: String) -> Color {
+        if log.contains("✓") {
+            return .green
+        } else if log.contains("✗") {
+            return .red
+        } else if log.contains("⚠") {
+            return .orange
+        } else {
+            return .primary
         }
     }
 }
