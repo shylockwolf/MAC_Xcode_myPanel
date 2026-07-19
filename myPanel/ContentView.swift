@@ -22,12 +22,38 @@ private func logError(_ msg: String) { print("ERROR: \(msg)") }
 #endif
 
 struct ContentView: View {
-    @State private var selectedFiles: [String] = Array(repeating: "", count: 9)
-    @State private var buttonLabels: [String] = Array(repeating: "select", count: 9)
+    /// 默认每列项数
+    private static let defaultItemCount: Int = 9
+    /// 最大列数（大面板模式），数组始终按此列数存储，保证切换模式不丢数据
+    private static let maxColumns: Int = 4
+
+    @State private var selectedFiles: [String] = Array(repeating: "", count: defaultItemCount * maxColumns)
+    @State private var buttonLabels: [String] = Array(repeating: "select", count: defaultItemCount * maxColumns)
     @State private var prefs = Preferences(theme: "default", language: "en")
-    @State private var disabledButtons: [Bool] = Array(repeating: false, count: 9)
-    @State private var itemCount: Int = 9
+    @State private var disabledButtons: [Bool] = Array(repeating: false, count: defaultItemCount * maxColumns)
+    @State private var itemCount: Int = defaultItemCount
+    @State private var isLargePanel: Bool = false
     @State private var externalDrives: [URL] = []
+
+    private var maxColumns: Int { Self.maxColumns }
+
+    private var columnCount: Int {
+        isLargePanel ? maxColumns : 1
+    }
+
+    /// 存储总数：始终按最大列数保存，切换模式只改显示不改存储
+    private var totalItems: Int {
+        itemCount * maxColumns
+    }
+
+    /// 当前需要显示的索引：单列模式只显示第 1 列（0, 4, 8, ...），大面板显示全部
+    private var displayIndices: [Int] {
+        if isLargePanel {
+            return Array(0..<totalItems)
+        } else {
+            return (0..<itemCount).map { $0 * maxColumns }
+        }
+    }
     @State private var showExternalDrives: Bool = false
     @State private var isEjecting: Bool = false
     @StateObject private var ejectionWindowController = EjectionProgressWindowController()
@@ -74,14 +100,34 @@ struct ContentView: View {
                                     .frame(width: 24, height: 24)
                                     .contentShape(Rectangle())
                             }
-                            .buttonStyle(PlainButtonStyle())
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.gray.opacity(0.1))
-                        .cornerRadius(8)
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(8)
 
-                        Spacer()
+                    VStack(spacing: 2) {
+                        Text("大面板")
+                            .font(.caption)
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+                        Toggle("", isOn: $isLargePanel)
+                            .labelsHidden()
+                            .toggleStyle(.switch)
+                            .controlSize(.mini)
+                            .onChange(of: isLargePanel) { _, _ in
+                                adjustWindowSize()
+                                saveConfig()
+                            }
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 4)
+                    .background(isLargePanel ? Color.blue.opacity(0.1) : Color.gray.opacity(0.1))
+                    .cornerRadius(8)
+                    .help(isLargePanel ? "当前：四列模式（点击关闭）" : "当前：单列模式（点击开启）")
+
+                    Spacer()
 
                         Text("myPanel")
                             .font(.largeTitle)
@@ -93,10 +139,10 @@ struct ContentView: View {
                             Text("Shylock Wolf")
                                 .font(.caption)
                                 .foregroundColor(.gray)
-                            Text("ver 3.0.3")
+                            Text("ver 3.1.1")
                                 .font(.caption)
                                 .foregroundColor(.gray)
-                            Text("2026-04")
+                            Text("2026-07")
                                 .font(.caption)
                                 .foregroundColor(.gray)
                         }
@@ -179,57 +225,63 @@ struct ContentView: View {
                 }
                 .padding(.horizontal, 20)
 
-                ForEach(0..<itemCount, id: \.self) { idx in
-                    HStack(spacing: 10) {
-                        Button(action: {
-                            handleButtonClick(index: idx)
-                        }) {
-                            Image(systemName: selectedFiles[idx].isEmpty ? "paperclip.circle" : "play.circle")
-                                .foregroundColor(.blue)
-                                .font(.system(size: 32))
-                        }
-                        .buttonStyle(PlainButtonStyle())
+                let columns: [GridItem] = isLargePanel ?
+                    Array(repeating: GridItem(.flexible(minimum: 250), spacing: 10), count: 4) :
+                    [GridItem(.flexible())]
 
-                        if let icon = getFileIcon(for: idx) {
-                            Image(nsImage: icon)
-                                .resizable()
-                                .frame(width: 32, height: 32)
-                        } else {
-                            Image(systemName: "rectangle.dashed")
-                                .font(.system(size: 24))
-                                .foregroundColor(.gray)
-                                .frame(width: 32, height: 32)
-                        }
+                LazyVGrid(columns: columns, spacing: 10) {
+                    ForEach(displayIndices, id: \.self) { idx in
+                        HStack(spacing: 10) {
+                            Button(action: {
+                                handleButtonClick(index: idx)
+                            }) {
+                                Image(systemName: selectedFiles[idx].isEmpty ? "paperclip.circle" : "play.circle")
+                                    .foregroundColor(.blue)
+                                    .font(.system(size: 32))
+                            }
+                            .buttonStyle(PlainButtonStyle())
 
-                        Text(getFileName(for: idx))
-                            .font(.system(size: 12))
-                            .foregroundColor(.primary)
-                            .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
-                            .padding(.horizontal, 10)
-                            .background(Color.gray.opacity(0.1))
-                            .cornerRadius(6)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                            )
+                            if let icon = getFileIcon(for: idx) {
+                                Image(nsImage: icon)
+                                    .resizable()
+                                    .frame(width: 32, height: 32)
+                            } else {
+                                Image(systemName: "rectangle.dashed")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(.gray)
+                                    .frame(width: 32, height: 32)
+                            }
 
-                        Button(action: {
-                            clearItem(index: idx)
-                        }) {
-                            Image(systemName: "trash.circle.fill")
-                                .foregroundColor(.blue)
-                                .font(.system(size: 16))
+                            Text(getFileName(for: idx))
+                                .font(.system(size: 12))
+                                .foregroundColor(.primary)
+                                .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+                                .padding(.horizontal, 10)
+                                .background(Color.gray.opacity(0.1))
+                                .cornerRadius(6)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                                )
+
+                            Button(action: {
+                                clearItem(index: idx)
+                            }) {
+                                Image(systemName: "trash.circle.fill")
+                                    .foregroundColor(.blue)
+                                    .font(.system(size: 16))
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .help("Clear Item")
                         }
-                        .buttonStyle(PlainButtonStyle())
-                        .help("Clear Item")
                     }
-                    .padding(.horizontal, 20)
                 }
+                .padding(.horizontal, 20)
                 Spacer().frame(height: 20)
             }
         }
         }
-        .frame(minWidth: 350, idealWidth: 350, maxWidth: .infinity,
+        .frame(minWidth: calculateWindowWidth(), idealWidth: calculateWindowWidth(), maxWidth: .infinity,
                minHeight: 450, idealHeight: calculateWindowHeight(), maxHeight: .infinity)
         .onAppear {
             loadConfig()
@@ -254,8 +306,30 @@ struct ContentView: View {
         let externalDriveHeight: CGFloat = 55
         let itemHeight: CGFloat = 55
         let bottomSpacing: CGFloat = 20
-        let totalHeight = headerHeight + externalDriveHeight + (CGFloat(itemCount) * itemHeight) + bottomSpacing
+        let rows = CGFloat(itemCount)
+
+        let totalHeight = headerHeight + externalDriveHeight + (rows * itemHeight) + bottomSpacing
         return max(totalHeight, 450)
+    }
+
+    private func calculateWindowWidth() -> CGFloat {
+        return isLargePanel ? 1200 : 350
+    }
+
+    private func adjustWindowSize() {
+        if let window = NSApp.keyWindow {
+            let newWidth = calculateWindowWidth()
+            let newHeight = calculateWindowHeight()
+
+            window.minSize = NSSize(width: newWidth, height: 450)
+
+            let currentFrame = window.frame
+            let newFrame = NSRect(x: currentFrame.origin.x,
+                                  y: currentFrame.origin.y + currentFrame.height - newHeight,
+                                  width: newWidth,
+                                  height: newHeight)
+            window.setFrame(newFrame, display: true, animate: true)
+        }
     }
     
     private func handleButtonClick(index: Int) {
@@ -363,7 +437,7 @@ struct ContentView: View {
                 lastModifiedTimes.append(0)
             }
         }
-        let cfg = AppConfig(lastOpenedFiles: selectedFiles, preferences: prefs, lastModifiedTimes: lastModifiedTimes, itemCount: itemCount)
+        let cfg = AppConfig(lastOpenedFiles: selectedFiles, preferences: prefs, lastModifiedTimes: lastModifiedTimes, itemCount: itemCount, isLargePanel: isLargePanel)
         ConfigManager.shared.saveConfig(cfg)
     }
     
@@ -371,46 +445,41 @@ struct ContentView: View {
         print("DEBUG: 开始加载配置")
         if let cfg = ConfigManager.shared.loadConfig() {
             print("DEBUG: 配置加载成功, itemCount=\(cfg.itemCount), lastOpenedFiles.count=\(cfg.lastOpenedFiles.count)")
-            selectedFiles = cfg.lastOpenedFiles
+
+            itemCount = cfg.itemCount
+            isLargePanel = cfg.isLargePanel
             prefs = cfg.preferences
-            
-            let newCount = cfg.itemCount
-            
-            // 调整数组大小以匹配新的 itemCount
-            if selectedFiles.count < newCount {
-                selectedFiles.append(contentsOf: Array(repeating: "", count: newCount - selectedFiles.count))
-            } else if selectedFiles.count > newCount {
-                selectedFiles = Array(selectedFiles.prefix(newCount))
+
+            // 向后兼容：旧配置只有 itemCount 项（单列顺序存储），需重新分布到第 1 列
+            let expectedTotal = itemCount * maxColumns
+            if cfg.lastOpenedFiles.count == expectedTotal {
+                selectedFiles = cfg.lastOpenedFiles
+                // 同步其他数组大小
+                resizeArraysToTotal()
+            } else {
+                selectedFiles = Array(repeating: "", count: expectedTotal)
+                for i in 0..<min(cfg.lastOpenedFiles.count, itemCount) {
+                    selectedFiles[i * maxColumns] = cfg.lastOpenedFiles[i]
+                }
+                // 同步其他数组大小
+                resizeArraysToTotal()
             }
-            
-            if buttonLabels.count < newCount {
-                buttonLabels.append(contentsOf: Array(repeating: "select", count: newCount - buttonLabels.count))
-            } else if buttonLabels.count > newCount {
-                buttonLabels = Array(buttonLabels.prefix(newCount))
-            }
-            
-            if disabledButtons.count < newCount {
-                disabledButtons.append(contentsOf: Array(repeating: false, count: newCount - disabledButtons.count))
-            } else if disabledButtons.count > newCount {
-                disabledButtons = Array(disabledButtons.prefix(newCount))
-            }
-            
-            itemCount = newCount
-            
-            for i in 0..<min(itemCount, cfg.lastOpenedFiles.count) {
-                if !cfg.lastOpenedFiles[i].isEmpty {
+
+            for i in 0..<selectedFiles.count {
+                if !selectedFiles[i].isEmpty {
                     buttonLabels[i] = "open"
                     disabledButtons[i] = true
                 }
             }
-            print("DEBUG: 配置应用完成, itemCount=\(itemCount), selectedFiles.count=\(selectedFiles.count), buttonLabels.count=\(buttonLabels.count), disabledButtons.count=\(disabledButtons.count)")
+            print("DEBUG: 配置应用完成, itemCount=\(itemCount), totalItems=\(totalItems), selectedFiles.count=\(selectedFiles.count), isLargePanel=\(isLargePanel)")
             logInfo("Config loaded via ConfigManager, applying to UI")
+            adjustWindowSize()
         } else {
             print("DEBUG: 没有找到配置文件，使用默认值")
             logDebug("No config found; using defaults")
-            selectedFiles = Array(repeating: "", count: itemCount)
-            buttonLabels = Array(repeating: "select", count: itemCount)
-            disabledButtons = Array(repeating: false, count: itemCount)
+            selectedFiles = Array(repeating: "", count: totalItems)
+            buttonLabels = Array(repeating: "select", count: totalItems)
+            disabledButtons = Array(repeating: false, count: totalItems)
         }
     }
     
@@ -447,30 +516,42 @@ struct ContentView: View {
     
     private func updateItemCount(_ newCount: Int) {
         let oldCount = itemCount
-        
-        if newCount > oldCount {
-            let additionalCount = newCount - oldCount
-            selectedFiles.append(contentsOf: Array(repeating: "", count: additionalCount))
-            buttonLabels.append(contentsOf: Array(repeating: "select", count: additionalCount))
-            disabledButtons.append(contentsOf: Array(repeating: false, count: additionalCount))
-        } else if newCount < oldCount {
-            selectedFiles = Array(selectedFiles.prefix(newCount))
-            buttonLabels = Array(buttonLabels.prefix(newCount))
-            disabledButtons = Array(disabledButtons.prefix(newCount))
-        }
-        
         itemCount = newCount
+        resizeArraysToTotal()
         saveConfig()
-        logInfo("项目数量已从 \(oldCount) 更新为 \(newCount)")
-        print("DEBUG: itemCount=\(itemCount), selectedFiles.count=\(selectedFiles.count)")
+        adjustWindowSize()
+        logInfo("项目数量已从 \(oldCount) 更新为 \(newCount) (每列)")
+        print("DEBUG: itemCount=\(itemCount), totalItems=\(totalItems), selectedFiles.count=\(selectedFiles.count)")
     }
-    
+
+    private func resizeArraysToTotal() {
+        let target = totalItems
+
+        if selectedFiles.count < target {
+            selectedFiles.append(contentsOf: Array(repeating: "", count: target - selectedFiles.count))
+        } else if selectedFiles.count > target {
+            selectedFiles = Array(selectedFiles.prefix(target))
+        }
+
+        if buttonLabels.count < target {
+            buttonLabels.append(contentsOf: Array(repeating: "select", count: target - buttonLabels.count))
+        } else if buttonLabels.count > target {
+            buttonLabels = Array(buttonLabels.prefix(target))
+        }
+
+        if disabledButtons.count < target {
+            disabledButtons.append(contentsOf: Array(repeating: false, count: target - disabledButtons.count))
+        } else if disabledButtons.count > target {
+            disabledButtons = Array(disabledButtons.prefix(target))
+        }
+    }
+
     private func resetApp() {
         let success = ConfigManager.shared.deleteConfig()
         if success {
-            selectedFiles = Array(repeating: "", count: itemCount)
-            buttonLabels = Array(repeating: "select", count: itemCount)
-            disabledButtons = Array(repeating: false, count: itemCount)
+            selectedFiles = Array(repeating: "", count: totalItems)
+            buttonLabels = Array(repeating: "select", count: totalItems)
+            disabledButtons = Array(repeating: false, count: totalItems)
             showAlert(title: L("reset_app"), message: L("reset_success"))
         } else {
             showAlert(title: L("reset_app"), message: "删除配置文件失败")

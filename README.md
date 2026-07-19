@@ -1,6 +1,6 @@
 # myPanel
 
-Version: 3.0.3
+Version: 3.1.1
 
 ## Overview
 
@@ -20,6 +20,29 @@ myPanel is a lightweight macOS application built with SwiftUI designed to manage
 - Version information display
 
 ## Changelog
+
+### Version 3.1.1
+
+#### Bug Fixes
+- Fixed crash when loading config with different itemCount than default
+- Fixed resizeArraysToTotal() to properly handle each array independently
+- Fixed array size synchronization issues between selectedFiles, buttonLabels, and disabledButtons
+
+#### Improvements
+- Updated version number to 3.1.1
+
+### Version 3.1.0
+
+#### New Features
+- Added large panel mode: switch between single-column and 4-column layout
+- Added toggle switch for large panel mode with visual status feedback
+- Each column maintains independent file configuration
+- Switching between modes preserves all file selections
+- Dynamic window resizing when switching modes
+
+#### Improvements
+- Updated version number to 3.1.0
+- Updated creation date to 2026-07-19
 
 ### Version 3.0.3
 
