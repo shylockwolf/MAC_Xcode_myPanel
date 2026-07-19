@@ -26,30 +26,25 @@ public final class ConfigManager {
     }
 
     private var configURL: URL {
-        // 统一使用 Documents 目录，确保配置持久化
-        return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("myPanel.json")
+        let appSupportDir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let appDir = appSupportDir.appendingPathComponent("shylockwolf.myPanel")
+        return appDir.appendingPathComponent("myPanel.json")
     }
     
     private func migrateFromSandboxIfNeeded() {
-        let userDocsURL = configURL
+        let userDocsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("myPanel.json")
         
-        // 如果已经存在配置文件，不需要迁移
-        if FileManager.default.fileExists(atPath: userDocsURL.path) {
+        if FileManager.default.fileExists(atPath: configURL.path) {
             return
         }
         
-        // 获取用户主目录
         let homeDir = FileManager.default.homeDirectoryForCurrentUser
         
-        // 尝试从多个可能的位置迁移配置
         let possiblePaths = [
-            // 沙盒Data目录下的配置文件
+            userDocsURL,
             homeDir.appendingPathComponent("Library/Containers/shylockwolf.myPanel/Data/myPanel.json"),
-            // 沙盒Documents目录
             homeDir.appendingPathComponent("Library/Containers/shylockwolf.myPanel/Data/Documents/myPanel.json"),
-            // 项目目录（旧DEBUG模式位置）
             URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("myPanel.json"),
-            // 旧版应用支持目录
             FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?.appendingPathComponent("myPanel/myPanel.json")
         ].compactMap { $0 }
         
@@ -57,13 +52,16 @@ public final class ConfigManager {
             let path = sourceURL.path
             if FileManager.default.fileExists(atPath: path) {
                 do {
-                    // 确保目标目录存在
-                    let targetDir = userDocsURL.deletingLastPathComponent()
+                    let targetDir = configURL.deletingLastPathComponent()
                     try FileManager.default.createDirectory(at: targetDir, withIntermediateDirectories: true)
                     
-                    // 复制文件
-                    try FileManager.default.copyItem(at: sourceURL, to: userDocsURL)
-                    logInfo("成功迁移配置: \(path) -> \(userDocsURL.path)")
+                    try FileManager.default.copyItem(at: sourceURL, to: configURL)
+                    logInfo("成功迁移配置: \(path) -> \(configURL.path)")
+                    
+                    if sourceURL == userDocsURL {
+                        try FileManager.default.removeItem(at: sourceURL)
+                        logInfo("清理旧配置文件: \(sourceURL.path)")
+                    }
                     return
                 } catch {
                     logError("从 \(path) 迁移失败: \(error.localizedDescription)")
@@ -81,11 +79,32 @@ public final class ConfigManager {
         do {
             let data = try Data(contentsOf: url)
             let decoder = JSONDecoder()
-            if let cfg = try? decoder.decode(AppConfig.self, from: data) {
+            
+            do {
+                let cfg = try decoder.decode(AppConfig.self, from: data)
                 logInfo("Loaded new format config from \(url.path)")
                 return cfg
+            } catch {
+                print("DEBUG: JSON 解析新格式失败: \(error)")
+                if let decodingError = error as? DecodingError {
+                    print("DEBUG: DecodingError 详情: \(decodingError.localizedDescription)")
+                    switch decodingError {
+                    case .typeMismatch(let type, let context):
+                        print("DEBUG: 类型不匹配 - 期望类型: \(type), 路径: \(context.codingPath), 详情: \(context.debugDescription)")
+                    case .valueNotFound(let type, let context):
+                        print("DEBUG: 值不存在 - 期望类型: \(type), 路径: \(context.codingPath), 详情: \(context.debugDescription)")
+                    case .keyNotFound(let key, let context):
+                        print("DEBUG: 键不存在 - 键: \(key.stringValue), 路径: \(context.codingPath), 详情: \(context.debugDescription)")
+                    case .dataCorrupted(let context):
+                        print("DEBUG: 数据损坏 - 路径: \(context.codingPath), 详情: \(context.debugDescription)")
+                    @unknown default:
+                        print("DEBUG: 未知解码错误")
+                    }
+                }
             }
-            if let old = try? decoder.decode([String].self, from: data) {
+            
+            do {
+                let old = try decoder.decode([String].self, from: data)
                 logInfo("Loaded old format config from \(url.path); migrating to new format")
                 let times = old.map { path -> TimeInterval in
                     if path.isEmpty { return 0 }
@@ -99,9 +118,13 @@ public final class ConfigManager {
                 let migrated = AppConfig(lastOpenedFiles: old, preferences: Preferences(theme: "default", language: "en"), lastModifiedTimes: times, itemCount: old.count)
                 saveConfig(migrated)
                 return migrated
+            } catch {
+                print("DEBUG: JSON 解析旧格式失败: \(error)")
             }
+            
         } catch {
             logError("Load failed: \(error.localizedDescription)")
+            print("DEBUG: 读取文件失败: \(error)")
         }
         return nil
     }

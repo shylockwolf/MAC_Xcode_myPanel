@@ -1,6 +1,6 @@
 # myPanel
 
-Version: 3.1.1
+Version: 3.1.2
 
 ## Overview
 
@@ -20,6 +20,16 @@ myPanel is a lightweight macOS application built with SwiftUI designed to manage
 - Version information display
 
 ## Changelog
+
+### Version 3.1.2
+
+#### Improvements
+- Moved config file from ~/Documents/myPanel.json to ~/Library/Application Support/shylockwolf.myPanel/myPanel.json
+- Added automatic migration from old config locations
+- Clean up old ~/Documents/myPanel.json after migration
+
+#### Bug Fixes
+- Updated version number to 3.1.2
 
 ### Version 3.1.1
 

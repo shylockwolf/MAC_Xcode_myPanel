@@ -139,7 +139,7 @@ struct ContentView: View {
                             Text("Shylock Wolf")
                                 .font(.caption)
                                 .foregroundColor(.gray)
-                            Text("ver 3.1.1")
+                            Text("ver 3.1.2")
                                 .font(.caption)
                                 .foregroundColor(.gray)
                             Text("2026-07")
