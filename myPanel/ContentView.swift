@@ -139,10 +139,10 @@ struct ContentView: View {
                             Text("Shylock Wolf")
                                 .font(.caption)
                                 .foregroundColor(.gray)
-                            Text("ver 3.1.2")
+                            Text("ver 3.2.0")
                                 .font(.caption)
                                 .foregroundColor(.gray)
-                            Text("2026-07")
+                            Text("2026-08")
                                 .font(.caption)
                                 .foregroundColor(.gray)
                         }
@@ -608,7 +608,7 @@ struct ContentView: View {
                 // 这个错误表示卷已经不存在，意味着磁盘已经弹出或被卸载
                 let nsError = error as NSError
                 if nsError.domain == "NSOSStatusErrorDomain" && nsError.code == -35 {
-                    logInfo("磁盘已不存在（可能已被系统卸载）: \(driveURL.path)")
+                    logInfo("磁盘已经顺利弹出: \(driveURL.path)")
                     await MainActor.run {
                         self.refreshExternalDrives()
                     }
@@ -672,8 +672,8 @@ struct ContentView: View {
                 } catch {
                     let nsError = error as NSError
                     if nsError.domain == "NSOSStatusErrorDomain" && nsError.code == -35 {
-                        logInfo("磁盘已不存在（可能已被系统卸载）: \(driveURL.path)")
-                        logs.append("⚠ 磁盘已不存在: \(driveURL.lastPathComponent)")
+                        logInfo("磁盘已经顺利弹出: \(driveURL.path)")
+                        logs.append("✓ 磁盘已经顺利弹出: \(driveURL.lastPathComponent)")
                         await MainActor.run {
                             ejectionWindowController.updateLogs(logs)
                         }

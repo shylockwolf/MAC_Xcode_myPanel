@@ -33,7 +33,15 @@ public final class ConfigManager {
     
     private func migrateFromSandboxIfNeeded() {
         let userDocsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("myPanel.json")
-        
+
+        // 无论是否需要迁移，都先确保配置目录存在，避免 saveConfig 因目录缺失而静默失败
+        let targetDir = configURL.deletingLastPathComponent()
+        do {
+            try FileManager.default.createDirectory(at: targetDir, withIntermediateDirectories: true)
+        } catch {
+            print("ERROR: 创建配置目录失败: \(targetDir.path) - \(error.localizedDescription)")
+        }
+
         if FileManager.default.fileExists(atPath: configURL.path) {
             return
         }
@@ -131,12 +139,16 @@ public final class ConfigManager {
 
     public func saveConfig(_ config: AppConfig) {
         do {
+            let targetDir = configURL.deletingLastPathComponent()
+            try FileManager.default.createDirectory(at: targetDir, withIntermediateDirectories: true)
             let encoder = JSONEncoder()
             encoder.outputFormatting = .prettyPrinted
             let data = try encoder.encode(config)
             try data.write(to: configURL)
+            print("SAVE OK -> \(configURL.path)")
             logInfo("Saved config to: \(configURL.path)")
         } catch {
+            print("SAVE FAIL -> \(configURL.path) : \(error.localizedDescription)")
             logError("Save failed: \(error.localizedDescription)")
         }
     }

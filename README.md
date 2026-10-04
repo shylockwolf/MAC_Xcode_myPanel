@@ -1,6 +1,6 @@
 # myPanel
 
-Version: 3.1.2
+Version: 3.2.0
 
 ## Overview
 
@@ -20,6 +20,24 @@ myPanel is a lightweight macOS application built with SwiftUI designed to manage
 - Version information display
 
 ## Changelog
+
+### Version 3.2.0
+
+#### Bug Fixes
+- 修复首次运行/无旧配置时 `~/Library/Application Support/shylockwolf.myPanel/` 目录不存在导致配置文件无法写入的问题（选择后重启丢失）
+- ConfigManager 现在在初始化阶段即确保配置目录存在
+- saveConfig 增加双重目录创建保险（幂等 `createDirectory`）
+- saveConfig 增加控制台打印，成功/失败路径可在 Xcode 控制台直接查看，便于排障
+
+#### Improvements
+- Updated version number to 3.2.0
+
+### Version 3.1.3
+
+#### Improvements
+- Updated disk ejection success message from "磁盘已不存在" (Disk does not exist) to "磁盘已经顺利弹出" (Disk has been ejected successfully) for clearer user feedback
+- Updated version number to 3.1.3
+- Updated date to 2026-08
 
 ### Version 3.1.2
 
